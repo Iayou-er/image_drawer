@@ -1,5 +1,235 @@
 # Image Drawer
 
+Automatically draw image edge contours onto any window canvas by controlling the mouse.
+
+Supports **CLI** and **GUI** modes, **English / 中文** bilingual UI, and a built-in **canvas visual editor** with draggable selection.
+
+## Installation
+
+```
+pip install -r requirements.txt
+```
+
+## GUI (Recommended)
+
+```bash
+python ui.py
+```
+
+### Interface Overview
+
+The UI is split into a **left control panel** and a **right preview panel**.
+
+---
+
+### Left — Control Panel
+
+#### 1. Image
+
+| Control | Description |
+|---|---|
+| **Browse...** | Open an image file (PNG / JPG / BMP / TIFF / WebP). Edge detection runs automatically after loading. Shortcut: `Ctrl+O`. |
+| Path display | Read-only. Shows the full path of the loaded image. |
+
+#### 2. Image Parameters
+
+Adjust these to control edge detection and contour extraction. Preview tabs on the right update in real time.
+
+| Parameter | Default | Description |
+|---|---|---|
+| **Preset** | General | Quick-start preset: General / Complex Illustration / Photo-Portrait / Logo-Line Art. Each tunes all parameters for a specific image type. |
+| **Edge Mode** | Grayscale | Color space for edge detection: Grayscale / RGB Channels / LAB Channels. |
+| **Auto Canny** | on | Compute Canny thresholds adaptively from image median intensity. Sigma adjusts sensitivity (0.1 = sensitive, 0.5 = conservative). |
+| **Canny Low** | 50 | Canny edge detection low threshold. Pixels below this are ignored. Lower = more edges but more noise. Range 0–255. |
+| **Canny High** | 150 | Canny edge detection high threshold. Pixels above this are strong edges. If Low ≥ High, the two are auto-swapped. |
+| **Bilateral Filter** | off | Edge-preserving denoise filter. Smoothes flat areas while keeping sharp edges — better than Gaussian for illustrations. |
+| **Blur Kernel** | 5 | Gaussian blur kernel size applied before edge detection. Larger = less noise but fewer edges. Must be odd (even values auto +1). Range 1–31. |
+| **Epsilon** | 0.002 | Contour simplification factor. Larger = fewer points, rougher shapes. Formula: epsilon × contour perimeter. Range 0.0001–1.0. |
+| **Skip Points** | 2 | Sample every N points along the contour. 1 = keep all, 5 = keep 1/5th. Reduces total points to speed up drawing. |
+| **Min Area** | 50 | Minimum contour area in pixels. Smaller contours are discarded. Filters out noise and speckles. |
+| **Inner Contours** | off | Include nested contours inside shapes (RETR_TREE), not just outer boundaries. Max Depth controls nesting level. |
+| **Morph Close** | 0 | Morphological close kernel size. 0 = disabled. Values 3–7 can bridge small gaps between nearby edges. Must be odd. |
+| **Dedup Dist** | 2.0 | Chamfer-distance deduplication threshold in pixels. Contours closer than this are considered duplicates; only the larger one is kept. 0 = disabled. |
+| **Nearest-neighbor sort** | off | When enabled, reorders contours using a greedy nearest-neighbor algorithm starting from the largest, reducing total pen-up travel distance. |
+| **Target Size** | off | When enabled, the image is resized to fit W×H while preserving aspect ratio, padded with black. Off = auto-downscale only if any side > 4096px. Range 1–8192. |
+
+#### 3. Window
+
+| Control | Description |
+|---|---|
+| **Dropdown** | Lists all visible windows on the system. Select one as the draw target. |
+| **Refresh** | Re-scan visible windows and refresh the dropdown. Shortcut: `Ctrl+R`. |
+
+#### 4. Canvas Offset
+
+The canvas is the rectangular area inside the target window where drawing happens. The image is scaled to fit and centered within this region. You can define it numerically or visually.
+
+| Control | Default | Description |
+|---|---|---|
+| **Left** | 0 | Canvas offset from the window's top-left corner — horizontal (pixels). |
+| **Top** | 0 | Canvas offset from the window's top-left corner — vertical (pixels). |
+| **Width** | 0 | Canvas width in pixels. 0 = auto-uses the window width. |
+| **Height** | 0 | Canvas height in pixels. 0 = auto-uses the window height. |
+| **Auto-fill** | — | Resets Left/Top to 0 and sets Width/Height to match the selected window. |
+| **Select Canvas Region...** | — | Opens a semi-transparent overlay on the target window. Drag rectangle handles to visually define the canvas area. `Enter` = confirm, `Esc` = cancel, `W` = full window, `F` = snap to top-left. |
+
+> **Tip:** pygetwindow returns coordinates including title bars and borders. If the canvas (client area) is smaller than the window, compensate with Left/Top offsets and smaller Width/Height. Using the **Canvas tab** on the right for visual adjustment is recommended.
+
+#### 5. Mouse Settings
+
+| Parameter | Default | Description |
+|---|---|---|
+| **Speed** | 0.002 s/pt | Seconds to pause after each interpolated mouse point. Smaller = faster but target app may drop input. 0 = full speed. Range 0–1.0. |
+| **Contour Pause** | 0.1 s | Seconds to pause between strokes (after releasing the mouse button). Gives the target app time to process the mouse-up event. |
+| **Interp. Step** | 5 px | Interpolation step in pixels. Intermediate points are inserted when two points are farther apart than this. Smaller = smoother but more points. |
+| **Start Delay** | 3.0 s | Countdown seconds before drawing begins. Gives you time to move the cursor over the target window. |
+| **Pause between strokes** | on | When enabled, pauses for *Contour Pause* seconds after each stroke. When off, strokes are drawn continuously. |
+| **Button** | left | Mouse button used for drawing: left / right / middle / x1 / x2. |
+| **Manual mode** | off | When enabled, the program moves the cursor to each stroke's starting point and then waits for *you* to hold the selected button to draw. Release to pause. |
+
+#### 6. Action Buttons
+
+| Button | Description |
+|---|---|
+| **Dry Run** | Calculate and display statistics (contour count, point count, estimated time, canvas position, sort method, dedup info) without moving the mouse. Use to preview before committing to a real draw. |
+| **Start Drawing** | Begin the countdown, then control the mouse to draw all contours stroke by stroke onto the target window. Progress bar and elapsed time update in real time. |
+| **Abort** | Immediately stop drawing. The mouse button is released and already-drawn strokes remain. You can also press `Esc` during drawing to abort. |
+
+During drawing, all controls except **Abort** are disabled to prevent accidental changes.
+
+#### 7. Draw Target
+
+Choose where to draw: an **external window** (direct mouse control) or the **virtual board** (auto-draw contours, then edit freely, then export to the target window). Board mode supports pen color, width, and canvas size customization, plus a blank board option.
+
+---
+
+### Right — Preview Panel
+
+| Tab | Description |
+|---|---|
+| **Original** | The loaded image after optional resize/padding — exactly what the processing pipeline receives as input. |
+| **Edges** | Canny edge detection output. White lines = detected edges. Use this to tune Canny Low/High and Morph Close. |
+| **Overlay** | Green contour lines drawn on top of the original image. Shows the final strokes that will be drawn. Use this to tune Epsilon, Skip Points, Min Area, etc. |
+| **Canvas** | A screenshot of the selected target window with a draggable rectangle overlay. Drag handles to visually define the canvas area. Left/Top/Width/Height spinboxes sync in real time. `W` = select full window, `F` = snap to top-left. |
+
+Below the preview tabs, a read-only **Info Panel** displays statistics: contour count, total points, image dimensions, and dedup removals. After a Dry Run or completed drawing, it updates with the detailed report.
+
+---
+
+### Menu Bar
+
+| Menu | Description |
+|---|---|
+| **File → Open Image** | Open an image file. Shortcut: `Ctrl+O`. |
+| **File → Refresh Windows** | Refresh the window list. Shortcut: `Ctrl+R`. |
+| **File → Screenshot → Select Region** | Region screenshot: full-screen overlay, drag to select any area. `Enter` = confirm, `Esc` = cancel. |
+| **File → Screenshot → Full Screen** | Full-screen screenshot: capture the entire screen. Shortcut: `Ctrl+P`. |
+| **File → Exit** | Quit the program. Shortcut: `Ctrl+Q`. |
+| **View → Set Wallpaper** | Choose an image as the program's background wallpaper. Panels become semi-transparent (frosted glass effect). |
+| **View → Wallpaper Mode** | Stretch (single image scaled to fill) or Tile (image repeated). |
+| **View → Clear Wallpaper** | Remove the wallpaper and restore opaque panels. |
+| **View → Background Color** | Choose a solid background color (used when no wallpaper is set, or as fallback behind the wallpaper). |
+| **Language → English / 中文** | Switch the UI language. The preference is saved and restored on next launch. |
+| **Help → About** | Show version, user guide, and dependency information. |
+
+---
+
+## Command Line
+
+```bash
+# Preview edges (no drawing)
+python main.py cat.png --preview
+
+# Show statistics only
+python main.py cat.png --dry-run
+
+# List all visible windows
+python main.py --list-windows
+
+# Full draw
+python main.py cat.png
+
+# Specify window + canvas offset + right mouse button
+python main.py cat.png --window-title "My Game" --canvas-offset "10,10,780,580" --start-delay 5 --button right
+
+# Manual mode (user controls drawing by holding the button)
+python main.py cat.png --manual
+```
+
+## Build Standalone EXE
+
+```bash
+# Double-click the build script
+build.bat
+
+# Or build manually
+pip install pyinstaller
+python -m PyInstaller --clean build.spec
+```
+
+Output: `dist/ImageDrawer.exe` — no Python installation required.
+
+## Pipeline
+
+```
+Image → Grayscale → Canny Edge Detection → Contour Extraction → Simplify & Sort → Mouse Drawing
+```
+
+## CLI Flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--preview` | — | Preview processed contours, do not draw |
+| `--dry-run` | — | Show statistics, do not draw |
+| `--list-windows` | — | List all visible windows and exit |
+| `--window-title` | Godot | Target window title keyword (case-insensitive) |
+| `--canvas-offset` | 0,0,0,0 | Canvas region: `left,top,width,height` |
+| `--start-delay` | 3.0 | Countdown seconds before drawing |
+| `--speed` | 0.002 | Mouse speed in seconds per interpolated point |
+| `--button` | left | Mouse button: left / right / middle / x1 / x2 |
+| `--manual` | — | Manual mode: user holds button to draw |
+| `--canny-low` | 50 | Canny edge detection low threshold |
+| `--canny-high` | 150 | Canny edge detection high threshold |
+| `--morph-close` | 0 | Morphology close kernel (0 = off) |
+| `--nearest-neighbor` | — | Nearest-neighbor path sort |
+| `--no-pause` | — | No pause between strokes |
+| `--interpolate-step` | 5 | Mouse interpolation step in pixels |
+| `--skip-points` | 2 | Sample every N contour points |
+| `--min-area` | 50 | Minimum contour area filter |
+
+## Keyboard Shortcuts
+
+| Key | Context | Action |
+|---|---|---|
+| `Ctrl+O` | Anywhere | Open image file |
+| `Ctrl+R` | Anywhere | Refresh window list |
+| `Ctrl+P` | Anywhere | Full-screen screenshot |
+| `Ctrl+Q` | Anywhere | Exit program |
+| `Esc` | Drawing | Abort drawing immediately |
+| `Enter` | Canvas overlay / Screenshot | Confirm selection |
+| `Esc` | Canvas overlay / Screenshot | Cancel selection |
+| `W` | Overlay / Editor / Screenshot | Set selection to full size |
+| `F` | Overlay / Editor | Snap selection to top-left |
+
+## Modules
+
+| File | Role |
+|---|---|
+| `main.py` | CLI entry: argparse, orchestrate pipeline, coordinate conversion |
+| `ui.py` | PySide6 GUI: MainWindow, all widgets, signal/slot wiring, wallpaper system |
+| `ui_thread_worker.py` | QThread wrapper around MouseDrawer for background drawing |
+| `i18n.py` | English / Chinese translation dictionary |
+| `image_processor.py` | Core: load → grayscale → Canny → contours → simplify → dedup → sort |
+| `window_finder.py` | Window enumeration, activation, CanvasRegion math, coordinate mapping, screenshot capture |
+| `mouse_controller.py` | Low-level mouse drawing (pynput), interpolation, manual mode, hotkey abort |
+| `canvas_selector.py` | Canvas region visual editor (overlay + embedded widget + screenshot region selector) |
+| `build.spec` | PyInstaller config for single-EXE distribution |
+| `build.bat` | One-click build script |
+
+---
+
+# 图片绘制器 Image Drawer
+
 自动将图片的边缘轮廓通过鼠标拖拽绘制到任意窗口画布上。
 
 支持 **命令行** 和 **图形界面** 两种使用方式，提供 **英文 / 中文** 双语切换，内置可拖拽的**画布可视化编辑器**。
@@ -28,7 +258,7 @@ python ui.py
 
 | 操作 | 作用 |
 |---|---|
-| **Browse...** | 打开文件选择器，加载一张图片（支持 PNG / JPG / BMP / TIFF / WebP）。加载后自动执行边缘检测并在右侧三个标签页中显示结果。快捷键 `Ctrl+O`。 |
+| **Browse...** | 打开文件选择器，加载一张图片（支持 PNG / JPG / BMP / TIFF / WebP）。加载后自动执行边缘检测并在右侧标签页中显示结果。快捷键 `Ctrl+O`。 |
 | 路径显示框 | 只读，显示当前已加载图片的完整路径。 |
 
 #### 2. 图片参数
@@ -37,16 +267,21 @@ python ui.py
 
 | 参数 | 默认值 | 作用 |
 |---|---|---|
+| **Preset / 预设** | General | 快速上手预设：通用 / 复杂插画 / 照片人像 / Logo线条画。每个预设针对特定图片类型调整所有参数。 |
+| **Edge Mode / 边缘模式** | Grayscale | 边缘检测使用的色彩空间：灰度 / RGB 通道 / LAB 通道。 |
+| **Auto Canny / 自动阈值** | 开 | 根据图像中位数值自动计算 Canny 阈值。Sigma 控制灵敏度（0.1=敏感，0.5=保守）。 |
 | **Canny Low** | 50 | Canny 边缘检测的低阈值。低于此值的像素不被视为边缘。降低此值可以检测到更多弱边缘（但也会引入噪声）。范围 0-255。 |
-| **Canny High** | 150 | Canny 边缘检测的高阈值。高于此值的像素直接被认定为边缘。两个阈值配合决定了边缘的丰富程度。如果 Low ≥ High，系统会自动交换两者。 |
+| **Canny High** | 150 | Canny 边缘检测的高阈值。高于此值的像素直接被认定为边缘。如果 Low ≥ High，系统会自动交换两者。 |
+| **Bilateral Filter / 双边滤波** | 关 | 保留边缘的去噪滤波。平滑平坦区域同时保留锐利边缘——对插画效果优于高斯模糊。 |
 | **Blur Kernel** | 5 | 高斯模糊的核大小。在边缘检测前对图像进行模糊处理，去除噪点。值越大模糊越强，边缘越少但越干净。必须为奇数（偶数会自动 +1）。范围 1-31。 |
 | **Epsilon** | 0.002 | 轮廓简化系数。值越大，轮廓被简化得越厉害（点数越少，形状越粗糙）；值越小，轮廓越精细（点数越多）。公式：epsilon × 轮廓周长。范围 0.0001-1.0。 |
 | **Skip Points** | 2 | 采样间隔。每隔 N 个点取 1 个。设为 1 保留所有点，设为 5 则只保留五分之一。用于进一步减少绘制点数，加快绘制速度。 |
 | **Min Area** | 50 | 最小轮廓面积过滤。面积（像素）小于此值的轮廓会被丢弃。用于去除噪声和小碎块。 |
+| **Inner Contours / 内部轮廓** | 关 | 包含形状内部的嵌套轮廓（RETR_TREE），而不仅仅是外边界。Max Depth 控制嵌套层级深度。 |
 | **Morph Close** | 0 | 形态学闭运算核大小。0 = 禁用。设为 3-7 可将断裂的邻近边缘连接起来。必须为奇数（偶数会自动 +1）。 |
 | **Dedup Dist** | 2.0 | 轮廓去重距离阈值（像素）。使用 Chamfer 距离比较两条轮廓的相似度，距离小于此值的视为重复，仅保留面积更大者。0 = 不去重。 |
-| **Nearest-neighbor sort** | 关闭 | 开启后，使用贪心最近邻算法重新排列轮廓的绘制顺序。从面积最大的轮廓出发，每次跳到距离最近的未绘制轮廓，减少抬笔空移的总距离。关闭时按面积从大到小排序。 |
-| **Target Size** | 关闭 | 限制图片处理的最大尺寸（宽×高）。开启后，图片会被等比缩放并居中放置在黑色画布上。关闭时不限制（但单边 >4096px 会自动缩小到 2048）。范围 1-8192。 |
+| **Nearest-neighbor sort** | 关 | 开启后，使用贪心最近邻算法重新排列轮廓的绘制顺序。从面积最大的轮廓出发，每次跳到距离最近的未绘制轮廓，减少抬笔空移的总距离。关闭时按面积从大到小排序。 |
+| **Target Size** | 关 | 限制图片处理的最大尺寸（宽×高）。开启后，图片会被等比缩放并居中放置在黑色画布上。关闭时不限制（但单边 >4096px 会自动缩小到 2048）。范围 1-8192。 |
 
 #### 3. 窗口
 
@@ -92,6 +327,10 @@ python ui.py
 
 绘制过程中，左侧除 Abort 以外的所有控件都会被禁用，防止误操作。
 
+#### 7. 绘制目标
+
+选择绘制方式：**外部窗口**（直接控制鼠标）或**自带画板**（自动绘制轮廓后可自由编辑，再导出到目标窗口）。画板模式支持画笔颜色、粗细和画布大小自定义，也可打开空白画板。
+
 ---
 
 ### 右侧 — 预览面板
@@ -117,9 +356,13 @@ python ui.py
 | **File → Screenshot → Full Screen** | 全屏截图：一键截取整个屏幕。快捷键 `Ctrl+P`。 |
 | **File → Exit** | 退出程序。快捷键 `Ctrl+Q`。 |
 | **View → Set Wallpaper** | 设置程序背景壁纸（支持拉伸/平铺模式）。 |
-| **View → Background Color** | 设置程序背景纯色（未设壁纸时生效）。 |
+| **View → Wallpaper Mode** | 壁纸模式：拉伸（单张缩放填满）或平铺（图片重复）。 |
+| **View → Clear Wallpaper** | 清除壁纸并恢复不透明面板。 |
+| **View → Background Color** | 设置程序背景纯色（未设壁纸时生效，或作为壁纸背后的底色）。 |
 | **Language → English / 中文** | 切换界面语言。偏好自动保存，下次启动时生效。 |
-| **Help → About** | 显示版本和依赖信息。 |
+| **Help → About** | 显示版本、使用说明和依赖信息。 |
+
+---
 
 ## 命令行
 
@@ -156,7 +399,7 @@ python -m PyInstaller --clean build.spec
 
 输出 `dist/ImageDrawer.exe`，无需安装 Python 即可运行。
 
-## 流程
+## 处理流程
 
 ```
 图片 → 灰度化 → Canny 边缘检测 → 轮廓提取 → 简化排序 → 鼠标拖拽绘制
@@ -188,7 +431,10 @@ python -m PyInstaller --clean build.spec
 
 | 按键 | 场景 | 作用 |
 |---|---|---|
+| `Ctrl+O` | 任意 | 打开图片 |
+| `Ctrl+R` | 任意 | 刷新窗口列表 |
 | `Ctrl+P` | 任意 | 全屏截图 |
+| `Ctrl+Q` | 任意 | 退出程序 |
 | `Esc` | 绘制中 | 立即停止绘制 |
 | `Enter` | 遮罩选画布 / 截图 | 确认选区 |
 | `Esc` | 遮罩选画布 / 截图 | 取消选区 |
@@ -206,6 +452,6 @@ python -m PyInstaller --clean build.spec
 | `image_processor.py` | 边缘检测，轮廓提取，路径简化，去重排序 |
 | `window_finder.py` | 窗口定位，激活，画布区域，坐标映射，窗口截图 |
 | `mouse_controller.py` | 鼠标拖拽画线，线性插值，热键中断，手动模式 |
-| `canvas_selector.py` | 画布区域可视化编辑器（遮罩层 + 内嵌控件） |
+| `canvas_selector.py` | 画布区域可视化编辑器（遮罩层 + 内嵌控件 + 截图区域选择器） |
 | `build.spec` | PyInstaller 打包配置 |
 | `build.bat` | 一键打包脚本 |
