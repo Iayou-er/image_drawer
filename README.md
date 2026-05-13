@@ -1,3 +1,7 @@
+#something u have to know: this shit is created by claudecode with deepseekv4pro (btw: i do think it's helpful for drawing in 'Slay the spire 2'
+#这是用ai造出来的粪(不过个人觉得还挺好用的，尤其是在杀戮尖塔2画画
+
+
 # Image Drawer
 
 Automatically draw image edge contours onto any window canvas by controlling the mouse.
