@@ -580,5 +580,5 @@ python main.py cat.png --manual</pre>
     # ── Screenshot ──
     "btn_screenshot":         {"en": "Screenshot",                            "zh": "截图"},
     "screenshot_saved":       {"en": "Screenshot saved: {path}",              "zh": "截图已保存: {path}"},
-    "error_screenshot_failed": {"en": "Failed to capture window screenshot.",  "zh": "窗口截图失败。"},
+    "error_screenshot_failed": {"en": "Failed to capture screenshot.",         "zh": "截图失败。"},
 }

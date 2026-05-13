@@ -603,3 +603,277 @@ class CanvasEditor(QWidget):
             QPoint(r.right(), r.center().y()),
         ]
         return [QRect(p.x() - hs, p.y() - hs, hs * 2, hs * 2) for p in pts]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Screen Region Selector (for arbitrary screenshot capture)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_SCR_HANDLE = 8
+_SCR_MIN = 10
+
+
+class ScreenRegionSelector(QWidget):
+    """Full-screen overlay for selecting an arbitrary screenshot region.
+
+    Shows a full-screen screenshot as background. User drags to define a
+    selection rectangle, adjusts handles, then presses Enter to confirm.
+
+    Signals:
+        confirmed(QRect): selected rectangle in screen pixel coordinates
+        cancelled()
+    """
+
+    confirmed = Signal(QRect)
+    cancelled = Signal()
+
+    def __init__(self, pixmap: QPixmap, screen_geo: QRect):
+        super().__init__()
+        self._pixmap = pixmap
+        self._screen_geo = screen_geo
+        self._selection = QRect()
+        self._dragging = False
+        self._drag_mode: str | None = None
+        self._drag_start = QPoint()
+        self._drag_rect_start = QRect()
+
+        self._init_ui()
+
+    def _init_ui(self):
+        self.setWindowFlags(
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
+        )
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
+        self.setGeometry(self._screen_geo)
+        self.setMouseTracking(True)
+
+    # ── Keyboard ────────────────────────────────────────────────────────────
+
+    def keyPressEvent(self, event: QKeyEvent):
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if self._has_selection():
+                self.confirmed.emit(QRect(self._selection))
+                self.close()
+        elif event.key() == Qt.Key_Escape:
+            self.cancelled.emit()
+            self.close()
+        elif event.key() == Qt.Key_W:
+            sw, sh = self._screen_geo.width(), self._screen_geo.height()
+            self._selection = QRect(0, 0, sw, sh)
+            self.update()
+        elif event.key() == Qt.Key_F:
+            if self._has_selection():
+                self._selection.moveTo(0, 0)
+                self.update()
+
+    # ── Mouse ───────────────────────────────────────────────────────────────
+
+    def _has_selection(self) -> bool:
+        return not self._selection.isNull() and self._selection.width() > 0
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() != Qt.LeftButton:
+            return
+        pos = event.position().toPoint()
+
+        if self._has_selection():
+            handle = self._hit_handle(pos)
+            if handle:
+                self._drag_mode = handle
+                self._drag_start = pos
+                self._drag_rect_start = QRect(self._selection)
+                self._dragging = True
+                return
+            if self._selection.contains(pos):
+                self._drag_mode = "move"
+                self._drag_start = pos
+                self._drag_rect_start = QRect(self._selection)
+                self._dragging = True
+                return
+
+        # Start creating a new selection
+        self._drag_mode = "create"
+        self._drag_start = pos
+        self._selection = QRect(pos, pos)
+        self._dragging = True
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        pos = event.position().toPoint()
+        if self._dragging:
+            self._apply_drag(pos)
+            self.update()
+        else:
+            if self._has_selection():
+                handle = self._hit_handle(pos)
+                if handle in ("tl", "br"):
+                    self.setCursor(Qt.SizeFDiagCursor)
+                elif handle in ("tr", "bl"):
+                    self.setCursor(Qt.SizeBDiagCursor)
+                elif handle in ("t", "b"):
+                    self.setCursor(Qt.SizeVerCursor)
+                elif handle in ("l", "r"):
+                    self.setCursor(Qt.SizeHorCursor)
+                elif self._selection.contains(pos):
+                    self.setCursor(Qt.SizeAllCursor)
+                else:
+                    self.setCursor(Qt.CrossCursor)
+            else:
+                self.setCursor(Qt.CrossCursor)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        self._dragging = False
+        self._drag_mode = None
+        if not self._selection.isNull():
+            self._selection = self._selection.normalized()
+            self.update()
+
+    def _apply_drag(self, pos: QPoint):
+        sw, sh = self._screen_geo.width(), self._screen_geo.height()
+        r = QRect(self._drag_rect_start)
+        mode = self._drag_mode
+
+        if mode == "create":
+            r = QRect(self._drag_start, pos).normalized()
+        elif mode == "move":
+            dx = pos.x() - self._drag_start.x()
+            dy = pos.y() - self._drag_start.y()
+            r.translate(dx, dy)
+            r.setLeft(max(0, r.left()))
+            r.setTop(max(0, r.top()))
+            r.setRight(min(sw, r.right()))
+            r.setBottom(min(sh, r.bottom()))
+        elif mode == "tl":
+            r.setLeft(min(pos.x(), r.right() - _SCR_MIN))
+            r.setTop(min(pos.y(), r.bottom() - _SCR_MIN))
+        elif mode == "tr":
+            r.setRight(max(pos.x(), r.left() + _SCR_MIN))
+            r.setTop(min(pos.y(), r.bottom() - _SCR_MIN))
+        elif mode == "bl":
+            r.setLeft(min(pos.x(), r.right() - _SCR_MIN))
+            r.setBottom(max(pos.y(), r.top() + _SCR_MIN))
+        elif mode == "br":
+            r.setRight(max(pos.x(), r.left() + _SCR_MIN))
+            r.setBottom(max(pos.y(), r.top() + _SCR_MIN))
+        elif mode == "t":
+            r.setTop(min(pos.y(), r.bottom() - _SCR_MIN))
+        elif mode == "b":
+            r.setBottom(max(pos.y(), r.top() + _SCR_MIN))
+        elif mode == "l":
+            r.setLeft(min(pos.x(), r.right() - _SCR_MIN))
+        elif mode == "r":
+            r.setRight(max(pos.x(), r.left() + _SCR_MIN))
+
+        r.setLeft(max(0, r.left()))
+        r.setTop(max(0, r.top()))
+        r.setRight(min(sw, r.right()))
+        r.setBottom(min(sh, r.bottom()))
+        self._selection = r
+
+    def _hit_handle(self, pos: QPoint) -> str | None:
+        r = self._selection
+        hs = _SCR_HANDLE
+        corners = [
+            ("tl", r.topLeft()), ("tr", r.topRight()),
+            ("bl", r.bottomLeft()), ("br", r.bottomRight()),
+        ]
+        for key, p in corners:
+            if QRect(p.x() - hs, p.y() - hs, hs * 2, hs * 2).contains(pos):
+                return key
+        edges = [
+            ("t", QPoint(r.center().x(), r.top()), hs, hs * 2),
+            ("b", QPoint(r.center().x(), r.bottom()), hs, hs * 2),
+            ("l", QPoint(r.left(), r.center().y()), hs * 2, hs),
+            ("r", QPoint(r.right(), r.center().y()), hs * 2, hs),
+        ]
+        for key, p, hw, hh in edges:
+            if QRect(p.x() - hw, p.y() - hh, hw * 2, hh * 2).contains(pos):
+                return key
+        return None
+
+    # ── Paint ───────────────────────────────────────────────────────────────
+
+    def paintEvent(self, event: QPaintEvent):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+
+        w, h = self._screen_geo.width(), self._screen_geo.height()
+
+        # Background: screenshot
+        p.drawPixmap(0, 0, self._pixmap)
+
+        if self._has_selection():
+            sel = self._selection
+
+            # Dim outside selection
+            dim = QColor(0, 0, 0, 120)
+            if sel.x() > 0:
+                p.fillRect(0, 0, sel.x(), h, dim)
+            if sel.right() < w:
+                p.fillRect(sel.right(), 0, w - sel.right(), h, dim)
+            if sel.y() > 0:
+                p.fillRect(sel.x(), 0, sel.width(), sel.y(), dim)
+            if sel.bottom() < h:
+                p.fillRect(sel.x(), sel.bottom(), sel.width(), h - sel.bottom(), dim)
+
+            # Selection fill
+            p.fillRect(sel, QColor(0, 140, 255, 40))
+
+            # Selection border
+            pen = QPen(QColor(0, 160, 255, 220), 2)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+            p.drawRect(sel)
+
+            # Handles
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(255, 255, 255, 220))
+            for hr in self._handle_rects():
+                p.drawRoundedRect(hr, 2, 2)
+
+            # Size / position text
+            font = QFont("Consolas, monospace", 11)
+            font.setBold(True)
+            p.setFont(font)
+            text = f"({sel.x()}, {sel.y()})  {sel.width()} x {sel.height()}"
+            p.setPen(QColor(255, 255, 255, 240))
+            p.drawText(sel, Qt.AlignCenter, text)
+        else:
+            # No selection — dim the whole screen lightly and show crosshair hint
+            p.fillRect(0, 0, w, h, QColor(0, 0, 0, 80))
+
+            hint_font = QFont("Consolas, monospace", 20)
+            hint_font.setBold(True)
+            p.setFont(hint_font)
+            hint = "Click and drag to select screenshot region"
+            fm = p.fontMetrics()
+            htw = fm.horizontalAdvance(hint)
+            p.setPen(QColor(255, 255, 255, 200))
+            p.drawText((w - htw) // 2, h // 2, hint)
+
+        # Help bar at the bottom
+        help_font = QFont("Consolas, monospace", 10)
+        p.setFont(help_font)
+        help_text = "Click and drag to select region  |  Enter=Confirm  |  Esc=Cancel  |  W=Full Screen"
+        fm = p.fontMetrics()
+        tw = fm.horizontalAdvance(help_text)
+        th = fm.height()
+        bar_h = th + 14
+        p.fillRect(0, h - bar_h, w, bar_h, QColor(0, 0, 0, 180))
+        p.setPen(QColor(255, 255, 255, 220))
+        p.drawText((w - tw) // 2, h - 8, help_text)
+
+        p.end()
+
+    def _handle_rects(self) -> list[QRect]:
+        hs = _SCR_HANDLE
+        r = self._selection
+        pts = [
+            r.topLeft(), r.topRight(),
+            r.bottomLeft(), r.bottomRight(),
+            QPoint(r.center().x(), r.top()),
+            QPoint(r.center().x(), r.bottom()),
+            QPoint(r.left(), r.center().y()),
+            QPoint(r.right(), r.center().y()),
+        ]
+        return [QRect(p.x() - hs, p.y() - hs, hs * 2, hs * 2) for p in pts]

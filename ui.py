@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     )
     from mouse_controller import MouseConfig, DrawResult, MouseDrawer
     from ui_thread_worker import DrawWorker
-    from canvas_selector import CanvasSelector, CanvasEditor, select_canvas
+    from canvas_selector import CanvasSelector, CanvasEditor, ScreenRegionSelector, select_canvas
 
 
 PRESETS = [
@@ -1649,11 +1649,11 @@ class MainWindow(QMainWindow):
     # ── Screenshot ─────────────────────────────────────────────────────────
 
     def _on_screenshot(self):
-        """Hide window, capture full screen, then restore and prompt save."""
+        """Hide window, let user select a screen region, then save."""
         self.hide()
         QApplication.processEvents()
         import time
-        time.sleep(0.25)
+        time.sleep(0.3)
 
         screen = QApplication.primaryScreen()
         if screen is None:
@@ -1669,16 +1669,23 @@ class MainWindow(QMainWindow):
             self._show_error(tr("error_title_draw"), tr("error_screenshot_failed"))
             return
 
-        qimg = pixmap.toImage().convertToFormat(QImage.Format_RGB888)
-        w, h = qimg.width(), qimg.height()
-        bpl = qimg.bytesPerLine()
-        ptr = qimg.constBits()
-        import numpy as np
-        arr = np.array(ptr, copy=True).reshape(h, bpl)
-        if bpl != w * 3:
-            arr = arr[:, :w * 3]
-        arr = arr.reshape(h, w, 3)[..., ::-1]  # RGB → BGR
+        selector = ScreenRegionSelector(pixmap, geo)
+        selected_rect = None
 
+        def on_confirmed(rect):
+            nonlocal selected_rect
+            selected_rect = rect
+
+        selector.confirmed.connect(on_confirmed)
+        selector.show()
+        while selector.isVisible():
+            QApplication.processEvents()
+            time.sleep(0.03)
+
+        if selected_rect is None:
+            return
+
+        cropped = pixmap.copy(selected_rect)
         path, _ = QFileDialog.getSaveFileName(
             self, tr("btn_screenshot"), "screenshot.png",
             "PNG (*.png);;JPEG (*.jpg);;All Files (*.*)",
@@ -1686,8 +1693,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
 
-        import cv2
-        cv2.imwrite(path, arr)
+        cropped.save(path, "PNG")
         self._status_bar.showMessage(tr("screenshot_saved").format(path=path))
 
     # ── Slot: Abort ───────────────────────────────────────────────────────
