@@ -113,6 +113,8 @@ python ui.py
 |---|---|
 | **File → Open Image** | 打开图片（同 Browse 按钮）。快捷键 `Ctrl+O`。 |
 | **File → Refresh Windows** | 刷新窗口列表。快捷键 `Ctrl+R`。 |
+| **File → Screenshot → Select Region** | 自选截图：全屏遮罩，拖拽框选任意区域截取。`Enter` 确认，`Esc` 取消。 |
+| **File → Screenshot → Full Screen** | 全屏截图：一键截取整个屏幕。快捷键 `Ctrl+P`。 |
 | **File → Exit** | 退出程序。快捷键 `Ctrl+Q`。 |
 | **View → Set Wallpaper** | 设置程序背景壁纸（支持拉伸/平铺模式）。 |
 | **View → Background Color** | 设置程序背景纯色（未设壁纸时生效）。 |
@@ -186,10 +188,11 @@ python -m PyInstaller --clean build.spec
 
 | 按键 | 场景 | 作用 |
 |---|---|---|
+| `Ctrl+P` | 任意 | 全屏截图 |
 | `Esc` | 绘制中 | 立即停止绘制 |
-| `Enter` | 遮罩选画布 | 确认选区 |
-| `Esc` | 遮罩选画布 | 取消选画布 |
-| `W` | 遮罩 / 编辑器 | 选区设为窗口全尺寸 |
+| `Enter` | 遮罩选画布 / 截图 | 确认选区 |
+| `Esc` | 遮罩选画布 / 截图 | 取消选区 |
+| `W` | 遮罩 / 编辑器 / 截图 | 选区设为全尺寸 |
 | `F` | 遮罩 / 编辑器 | 选区贴到窗口左上角 |
 
 ## 模块
