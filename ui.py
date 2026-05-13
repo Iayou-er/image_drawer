@@ -192,10 +192,14 @@ class MainWindow(QMainWindow):
         self._act_refresh.triggered.connect(self._on_refresh_windows)
         self._menu_file.addAction(self._act_refresh)
 
-        self._act_screenshot = QAction("", self)
-        self._act_screenshot.setShortcut(QKeySequence("Ctrl+P"))
-        self._act_screenshot.triggered.connect(self._on_screenshot)
-        self._menu_file.addAction(self._act_screenshot)
+        self._menu_screenshot = self._menu_file.addMenu("")
+        self._act_screenshot_region = QAction("", self)
+        self._act_screenshot_region.triggered.connect(self._on_screenshot_region)
+        self._menu_screenshot.addAction(self._act_screenshot_region)
+        self._act_screenshot_full = QAction("", self)
+        self._act_screenshot_full.setShortcut(QKeySequence("Ctrl+P"))
+        self._act_screenshot_full.triggered.connect(self._on_screenshot_full)
+        self._menu_screenshot.addAction(self._act_screenshot_full)
         self._menu_file.addSeparator()
         self._act_exit = QAction("", self)
         self._act_exit.setShortcut(QKeySequence("Ctrl+Q"))
@@ -465,7 +469,9 @@ class MainWindow(QMainWindow):
         self._menu_file.setTitle(tr("menu_file"))
         self._act_open.setText(tr("menu_file_open"))
         self._act_refresh.setText(tr("menu_file_refresh"))
-        self._act_screenshot.setText(tr("menu_file_screenshot"))
+        self._menu_screenshot.setTitle(tr("menu_file_screenshot"))
+        self._act_screenshot_region.setText(tr("menu_file_screenshot_region"))
+        self._act_screenshot_full.setText(tr("menu_file_screenshot_full"))
         self._act_exit.setText(tr("menu_file_exit"))
         self._menu_lang.setTitle(tr("menu_language"))
         self._act_lang_en.setText(tr("menu_language_en"))
@@ -1648,8 +1654,8 @@ class MainWindow(QMainWindow):
 
     # ── Screenshot ─────────────────────────────────────────────────────────
 
-    def _on_screenshot(self):
-        """Hide window, let user select a screen region, then save."""
+    def _do_hide_and_capture(self):
+        """Hide window, capture full screen, restore window, return pixmap or None."""
         self.hide()
         QApplication.processEvents()
         import time
@@ -1658,17 +1664,24 @@ class MainWindow(QMainWindow):
         screen = QApplication.primaryScreen()
         if screen is None:
             self.show()
-            self._show_error(tr("error_title_draw"), tr("error_screenshot_failed"))
-            return
+            return None
 
         geo = screen.geometry()
         pixmap = screen.grabWindow(0, geo.x(), geo.y(), geo.width(), geo.height())
         self.show()
 
         if pixmap.isNull():
+            return None
+        return pixmap, geo
+
+    def _on_screenshot_region(self):
+        """Region screenshot: user drags to select an area on screen."""
+        result = self._do_hide_and_capture()
+        if result is None:
             self._show_error(tr("error_title_draw"), tr("error_screenshot_failed"))
             return
 
+        pixmap, geo = result
         selector = ScreenRegionSelector(pixmap, geo)
         selected_rect = None
 
@@ -1678,6 +1691,7 @@ class MainWindow(QMainWindow):
 
         selector.confirmed.connect(on_confirmed)
         selector.show()
+        import time
         while selector.isVisible():
             QApplication.processEvents()
             time.sleep(0.03)
@@ -1694,6 +1708,24 @@ class MainWindow(QMainWindow):
             return
 
         cropped.save(path, "PNG")
+        self._status_bar.showMessage(tr("screenshot_saved").format(path=path))
+
+    def _on_screenshot_full(self):
+        """Full-screen screenshot: capture entire screen and prompt save."""
+        result = self._do_hide_and_capture()
+        if result is None:
+            self._show_error(tr("error_title_draw"), tr("error_screenshot_failed"))
+            return
+
+        pixmap, _geo = result
+        path, _ = QFileDialog.getSaveFileName(
+            self, tr("btn_screenshot"), "screenshot.png",
+            "PNG (*.png);;JPEG (*.jpg);;All Files (*.*)",
+        )
+        if not path:
+            return
+
+        pixmap.save(path, "PNG")
         self._status_bar.showMessage(tr("screenshot_saved").format(path=path))
 
     # ── Slot: Abort ───────────────────────────────────────────────────────
@@ -1855,7 +1887,7 @@ class MainWindow(QMainWindow):
         self._btn_refresh.setEnabled(enabled)
         self._btn_auto_fill.setEnabled(enabled)
         self._btn_select_canvas.setEnabled(enabled)
-        self._act_screenshot.setEnabled(enabled)
+        self._menu_screenshot.setEnabled(enabled)
         self._btn_open_blank_board.setEnabled(enabled)
         self._radio_draw_window.setEnabled(enabled)
         self._radio_draw_board.setEnabled(enabled)
