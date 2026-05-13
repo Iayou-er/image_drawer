@@ -8,11 +8,11 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import Qt, QTimer, Signal, QPoint
 from PySide6.QtGui import (
-    QPainter, QColor, QPen, QBrush, QFont, QPixmap, QKeyEvent,
+    QPainter, QColor, QPen, QPixmap, QKeyEvent,
     QMouseEvent, QWheelEvent, QPaintEvent, QCloseEvent, QResizeEvent,
 )
 from PySide6.QtWidgets import (
-    QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel, QFrame,
+    QWidget, QHBoxLayout, QPushButton, QLabel, QFrame,
 )
 
 import numpy as np
@@ -87,17 +87,6 @@ class VirtualCanvas(QWidget):
     def _init_pixmap(self):
         self._pixmap = QPixmap(self._cfg.canvas_width, self._cfg.canvas_height)
         self._pixmap.fill(Qt.white)
-
-    def _recreate_pixmap(self, w: int, h: int):
-        old = self._pixmap
-        self._pixmap = QPixmap(w, h)
-        self._pixmap.fill(Qt.white)
-        if old and not old.isNull():
-            p = QPainter(self._pixmap)
-            p.drawPixmap(0, 0, old)
-            p.end()
-        self._cfg.canvas_width = w
-        self._cfg.canvas_height = h
 
     def canvas_pixmap(self) -> QPixmap:
         return QPixmap(self._pixmap) if self._pixmap else QPixmap()

@@ -50,15 +50,6 @@ _STRINGS: dict[str, dict[str, str]] = {
 
     # ── About ──
     "about_title":            {"en": "About Image Drawer",                    "zh": "关于 图片绘制器"},
-    "about_text":             {"en": "<h3>Image Drawer</h3>"
-                                    "<p>Automatically draw image outlines onto a game canvas "
-                                    "by controlling the mouse.</p>"
-                                    "<p>Powered by OpenCV, PySide6, pynput, and pygetwindow.</p>",
-                               "zh": "<h3>图片绘制器</h3>"
-                                     "<p>自动将图片的边缘轮廓通过鼠标拖拽绘制到游戏画布上。</p>"
-                                     "<p>基于 OpenCV、PySide6、pynput、pygetwindow 构建。</p>"},
-    "about_user_guide":       {"en": "User Guide",                            "zh": "使用说明"},
-    "about_close":            {"en": "Close",                                 "zh": "关闭"},
 
     # ── In-App User Manual (HTML) ─────────────────────────────────────────────
     "manual_html": {
@@ -493,7 +484,6 @@ python main.py cat.png --manual</pre>
     "tooltip_delay":          {"en": "Countdown seconds before drawing",      "zh": "开始绘制前的倒计时秒数"},
     "chk_pause_between":      {"en": "Pause between strokes",                 "zh": "笔画间暂停"},
     "label_button":           {"en": "Button:",                               "zh": "鼠标按键:"},
-    "tooltip_button":         {"en": "Mouse button used for drawing",         "zh": "用于绘制线条的鼠标按键"},
     "chk_manual":             {"en": "Manual mode (hold button to draw)",     "zh": "手动模式 (按住按键绘制)"},
 
     # ── Actions Group ──
@@ -512,10 +502,6 @@ python main.py cat.png --manual</pre>
     "tab_canvas":             {"en": "Canvas",                                "zh": "画布编辑"},
     "label_no_image":         {"en": "Load an image to preview",              "zh": "加载图片以预览"},
     "label_no_image_short":   {"en": "No image",                              "zh": "无图片"},
-    "canvas_editor_no_window": {"en": "Select a window to view canvas",       "zh": "选择窗口以查看画布"},
-    "canvas_editor_hint":     {"en": "Drag handles  |  W=Full  |  F=Snap top-left",
-                               "zh": "拖拽手柄  |  W=全屏  |  F=贴左上角"},
-
     # ── Info Panel ──
     "info_contours":          {"en": "Contours: {n}  (closed: {c}, open: {o})", "zh": "轮廓: {n}  (闭合: {c}, 开放: {o})"},
     "info_points":            {"en": "Total points: {n}",                     "zh": "总点数: {n}"},
@@ -584,34 +570,15 @@ python main.py cat.png --manual</pre>
     "menu_view_bg_color":     {"en": "Background &Color...",                  "zh": "背景颜色(&C)"},
 
     # ── Draw Target ──
-    "group_draw_target":      {"en": "Draw Target",                           "zh": "绘制目标"},
     "draw_target_window":     {"en": "External window",                       "zh": "外部窗口"},
     "draw_target_board":      {"en": "Virtual board  →  edit  →  window",     "zh": "自带画板 → 编辑 → 输出到窗口"},
     "label_board_color":      {"en": "Pen color:",                            "zh": "画笔颜色:"},
     "label_board_width":      {"en": "Pen width:",                            "zh": "画笔粗细:"},
     "label_board_size":       {"en": "Board size:",                           "zh": "画板大小:"},
     "btn_open_blank_board":   {"en": "Open blank board",                      "zh": "打开空白画板"},
-    "board_title":            {"en": "Image Drawer — Board",                  "zh": "图片绘制器 — 画板"},
-
-    # ── Board Toolbar ──
-    "board_brush":            {"en": "Brush",                                 "zh": "画笔"},
-    "board_eraser":           {"en": "Eraser",                                "zh": "橡皮"},
-    "board_clear":            {"en": "Clear",                                 "zh": "清空"},
-    "board_save_png":         {"en": "Save PNG",                              "zh": "保存 PNG"},
-    "board_draw_to_window":   {"en": "Draw to Window",                        "zh": "绘制到窗口"},
-    "board_close":            {"en": "X",                                     "zh": "✕"},
-
-    # ── Board Status ──
-    "board_auto_drawing":     {"en": "Auto-drawing... {cur}/{total} strokes",  "zh": "自动绘制中... {cur}/{total} 笔画"},
-    "board_paused":           {"en": "Paused — {cur}/{total} strokes",         "zh": "已暂停 — {cur}/{total} 笔画"},
-    "board_edit_mode":        {"en": "Edit mode — draw freely on the canvas",  "zh": "编辑模式 — 在画布上自由绘制"},
-    "board_edit_detail":      {"en": "Edit mode — {mode}  |  {color}  |  {w}px", "zh": "编辑模式 — {mode}  |  {color}  |  {w}px"},
-    "board_mode_brush":       {"en": "Brush",                                 "zh": "画笔"},
-    "board_mode_eraser":      {"en": "Eraser",                                "zh": "橡皮"},
 
     # ── Screenshot ──
     "btn_screenshot":         {"en": "Screenshot",                            "zh": "截图"},
-    "tooltip_screenshot":     {"en": "Capture selected window to file",       "zh": "截取选中窗口并保存"},
     "screenshot_saved":       {"en": "Screenshot saved: {path}",              "zh": "截图已保存: {path}"},
     "error_screenshot_failed": {"en": "Failed to capture window screenshot.",  "zh": "窗口截图失败。"},
 }
